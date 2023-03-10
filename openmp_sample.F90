@@ -1,0 +1,109 @@
+
+! taken from https://people.math.sc.edu/Burkardt/f_src/openmp/compute_pi_openmp.f90
+
+program main
+  use omp_lib
+  implicit none
+  integer, parameter :: logn_max = 8
+  call omp_set_num_threads (8)
+  call r8_test ( logn_max )
+end
+
+subroutine r8_test ( logn_max )
+  use omp_lib
+  implicit none
+  double precision error_seq
+  double precision error_omp
+  double precision estimate_seq
+  double precision estimate_omp
+  integer logn
+  integer logn_max
+  character ( len = 3 ) mode
+  integer n
+  double precision, parameter :: r8_pi = 3.141592653589793D+00
+  double precision wtime
+  n = 1
+  do logn = 1, logn_max
+    mode = 'SEQ'
+    wtime = omp_get_wtime ( )
+
+    call r8_pi_est_seq ( n, estimate_seq )
+
+    wtime = omp_get_wtime ( ) - wtime
+    error_seq = abs ( estimate_seq - r8_pi )
+    
+    ! write ( *, '( i14, 2x, a3, 2x, f14.10, 2x, g14.6, 2x, g14.6 )' ) &
+    !   n, mode, estimate, error, wtime
+
+    mode = 'OMP'
+
+    wtime = omp_get_wtime ( )
+
+    call r8_pi_est_omp ( n, estimate_omp )
+
+    wtime = omp_get_wtime ( ) - wtime
+
+    error_omp = abs ( estimate_omp - r8_pi )
+
+    ! write ( *, '( i14, 2x, a3, 2x, f14.10, 2x, g14.6, 2x, g14.6 )' ) &
+    !   n, mode, estimate, error, wtime
+
+    n = n * 10
+
+  end do
+    write ( *, '(A, f14.10, g14.6, f14.10, g14.6 )' ) &
+      "F:", estimate_seq, error_seq, estimate_omp, error_omp
+  return
+end
+subroutine r8_pi_est_omp ( n, estimate )
+  implicit none
+  double precision h
+  double precision estimate
+  integer i
+  integer n
+  double precision sum2
+  double precision x
+  h = 1.0D+00 / dble ( 2 * n )
+  sum2 = 0.0D+00
+
+!$omp parallel &
+!$omp   shared ( h, n ) &
+!$omp   private ( i, x ) 
+
+!$omp do reduction ( + : sum2 )
+  do i = 1, n
+    x = h * dble ( 2 * i - 1 )
+    sum2 = sum2 + 1.0D+00 / ( 1.0D+00 + x**2 )
+  end do
+!$omp end do
+
+!$omp end parallel
+
+  estimate = 4.0D+00 * sum2 / dble ( n )
+
+  return
+end
+subroutine r8_pi_est_seq ( n, estimate )
+
+  implicit none
+
+  double precision h
+  double precision estimate
+  integer i
+  integer n
+  double precision sum2
+  double precision x
+
+  h = 1.0D+00 / dble ( 2 * n )
+
+  sum2 = 0.0D+00
+
+  do i = 1, n
+    x = h * dble ( 2 * i - 1 )
+    sum2 = sum2 + 1.0D+00 / ( 1.0D+00 + x**2 )
+  end do
+
+  estimate = 4.0D+00 * sum2 / dble ( n )
+
+  return
+end
